@@ -1,0 +1,46 @@
+{
+  "manifest_version": 3,
+  "description": "Deletes photos in Google Photos using a Fine Tuned ResNet50 model.",
+  "name": "Photo Deleter for Google Photos",
+  "version": "1.0",
+  "permissions": ["scripting", "activeTab"],
+  "content_scripts": [
+    {
+      "matches": [
+        "https://photos.google.com/*",
+        "https://photos.fife.usercontent.google.com/*",
+        "https://photos.googleusercontent.com/*"
+      ],
+      "all_frames": true,
+      "js": ["content.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": [
+        "icons/*",
+        "model/*",
+        "*.wasm",
+        "ort/*"
+      ],
+      "matches": ["<all_urls>"]
+    }
+  ],
+  "action": {
+    "default_popup": "popup.html"
+  },
+  "content_security_policy": {
+    "extension_pages": "script-src 'self' 'wasm-unsafe-eval'; object-src 'self'"
+  },
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "icons": {
+    "128": "icons/icon128.png",
+    "64": "icons/icon64.png",
+    "32": "icons/icon32.png",
+    "16": "icons/icon16.png"
+  }
+}
