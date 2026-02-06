@@ -3,7 +3,7 @@ let session = null;
 async function loadModel() {
     if (session) return session;
     
-    const modelUrl = chrome.runtime.getURL("model/resnet50_classifier.onnx");
+    const modelUrl = chrome.runtime.getURL("model/resnet50_fine_tunned_classifier.onnx");
     session = await ort.InferenceSession.create(modelUrl);
     return session;
 }

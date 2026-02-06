@@ -6,7 +6,7 @@
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.proxy = false;
 
-const MODEL_URL = chrome.runtime.getURL('model/resnet50_classifier.onnx');
+const MODEL_URL = chrome.runtime.getURL('model/resnet50_fine_tunned_classifier.onnx');
 const DELAYS = {
     confirmDialog: 500,
     afterAction: 1000
@@ -32,6 +32,78 @@ const SELECTORS = {
 // --- Event Listeners ---------------------------------------------------------
 document.getElementById("classifyBtn").addEventListener("click", classifyCurrentImage);
 document.getElementById("sequentialBtn").addEventListener("click", classifyAndDeleteSequentially);
+
+// --- Check Tab on Load -------------------------------------------------------
+document.addEventListener('DOMContentLoaded', checkCurrentTab);
+
+// =============================================================================
+// TAB VALIDATION
+// =============================================================================
+
+/**
+ * URL pattern for Google Photos single photo view
+ * Matches: https://photos.google.com/u/X/photo/... or https://photos.google.com/photo/...
+ */
+const GOOGLE_PHOTOS_PATTERN = /^https:\/\/photos\.google\.com\/(u\/\d+\/)?photo\/.+/;
+
+/**
+ * Checks if the current tab is a valid Google Photos photo view
+ */
+async function checkCurrentTab() {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    const isValidTab = GOOGLE_PHOTOS_PATTERN.test(tab.url);
+    
+    updateTabStatus(isValidTab, tab.url);
+}
+
+/**
+ * Updates the UI based on tab validity
+ * @param {boolean} isValid - Whether the tab is a valid Google Photos photo
+ * @param {string} url - Current tab URL
+ */
+function updateTabStatus(isValid, url) {
+    const classifyBtn = document.getElementById("classifyBtn");
+    const sequentialBtn = document.getElementById("sequentialBtn");
+    const helpSection = document.querySelector(".help-section");
+    const statusIndicator = document.getElementById("tabStatus");
+    
+    if (isValid) {
+        // Valid tab - enable buttons
+        classifyBtn.disabled = false;
+        sequentialBtn.disabled = false;
+        if (helpSection) helpSection.style.display = "none";
+        if (statusIndicator) {
+            statusIndicator.className = "tab-status valid";
+            statusIndicator.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/>
+                </svg>
+                <span data-i18n="tabValid">Ready! Photo detected</span>
+            `;
+        }
+        debugLog("✓ Valid Google Photos tab detected");
+    } else {
+        // Invalid tab - disable buttons
+        classifyBtn.disabled = true;
+        sequentialBtn.disabled = true;
+        if (helpSection) helpSection.style.display = "block";
+        if (statusIndicator) {
+            statusIndicator.className = "tab-status invalid";
+            statusIndicator.innerHTML = `
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
+                </svg>
+                <span data-i18n="tabInvalid">Open a photo in Google Photos</span>
+            `;
+        }
+        debugLog("✗ Not a Google Photos photo view");
+    }
+    
+    // Re-apply translations if available
+    if (typeof applyTranslations === 'function') {
+        applyTranslations();
+    }
+}
 
 // =============================================================================
 // IMAGE DETECTION
@@ -138,6 +210,7 @@ const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
  * Classifies the currently visible photo
  */
 async function classifyCurrentImage() {
+    hideResultBadge();
     debugLog("Clasificando foto actual...");
     
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -146,7 +219,10 @@ async function classifyCurrentImage() {
     if (!imageSrc) return;
 
     debugLog("Imagen: " + imageSrc.substring(0, 60) + "...");
-    await classifyImage(imageSrc);
+    const result = await classifyImage(imageSrc);
+    
+    // Show result badge
+    showResultBadge(result.isMemborable, result.confidence);
 }
 
 /**
@@ -162,8 +238,12 @@ async function classifyAndDeleteSequentially() {
     let deleted = 0;
     let kept = 0;
 
+    // Show stats bar
+    updateStats(0, count, kept, deleted);
+
     for (let i = 0; i < count; i++) {
         debugLog(`--- Foto ${i + 1}/${count} ---`);
+        updateStats(i + 1, count, kept, deleted);
 
         const imageSrc = await getCurrentImageSrc(tab.id);
         if (!imageSrc) break;
@@ -176,6 +256,9 @@ async function classifyAndDeleteSequentially() {
             debugLog("Error: " + err.message);
             break;
         }
+
+        // Show result badge
+        showResultBadge(result.isMemborable, result.confidence);
 
         if (!result.isMemborable) {
             // FORGETTABLE - Delete
@@ -196,6 +279,9 @@ async function classifyAndDeleteSequentially() {
             
             kept++;
         }
+
+        // Update stats after action
+        updateStats(i + 1, count, kept, deleted);
     }
 
     debugLog(`=== Completado: ${deleted} borradas, ${kept} conservadas ===`);
