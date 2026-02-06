@@ -10,14 +10,9 @@ let model = null;
 document.getElementById("classifyBtn").addEventListener("click", classifyCurrentImage);
 document.getElementById("sequentialBtn").addEventListener("click", classifyAndDeleteSequentially);
 
-// --- Handler Implementations ---
-async function classifyCurrentImage() {
-    debugLog("classifyBtn presionado");
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
-
-    // Get the first visible image src
+async function getCurrentImageSrc(tabId) {
     const [{ result: imageSrc }] = await chrome.scripting.executeScript({
-        target: { tabId: tab.id },
+        target: { tabId: tabId },
         func: () => {
             const isVisible = img => {
                 const rect = img.getBoundingClientRect();
@@ -41,11 +36,22 @@ async function classifyCurrentImage() {
 
     if (!imageSrc) {
         debugLog("No se encontró imagen visible");
-        return;
     }
+
+    return imageSrc;
+}
+
+// --- Handler Implementations ---
+async function classifyCurrentImage() {
+    debugLog("classifyBtn presionado");
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+
+    const imageSrc = await getCurrentImageSrc(tab.id);
+    if (!imageSrc) return;
+
     debugLog("Imagen encontrada: " + imageSrc);
 
-    await classifyImageBySrc(imageSrc);
+    await classifyImage(imageSrc);
 }
 
 async function classifyAndDeleteSequentially() {
@@ -59,41 +65,16 @@ async function classifyAndDeleteSequentially() {
     for (let i = 0; i < count; i++) {
         debugLog(`--- Procesando foto ${i + 1} de ${count} ---`);
 
-        // Get current image src from the page (same logic as classifyCurrentImage)
-        const [{ result: imageSrc }] = await chrome.scripting.executeScript({
-            target: { tabId: tab.id },
-            func: () => {
-                const isVisible = img => {
-                    const rect = img.getBoundingClientRect();
-                    const style = window.getComputedStyle(img);
-                    return (
-                        rect.width > 0 &&
-                        rect.height > 0 &&
-                        style.display !== "none" &&
-                        style.visibility !== "hidden" &&
-                        style.opacity !== "0" &&
-                        rect.bottom > 0 &&
-                        rect.right > 0 &&
-                        rect.top < (window.innerHeight || document.documentElement.clientHeight) &&
-                        rect.left < (window.innerWidth || document.documentElement.clientWidth)
-                    );
-                };
-                const img = Array.from(document.querySelectorAll('img.BiCYpc')).find(isVisible);
-                return img ? img.src : null;
-            }
-        });
-
-        if (!imageSrc) {
-            debugLog("No se encontró imagen, terminando...");
-            break;
-        }
+        // Get current image src from the page
+        const imageSrc = await getCurrentImageSrc(tab.id);
+        if (!imageSrc) break;
 
         debugLog("Imagen encontrada: " + imageSrc.substring(0, 50) + "...");
 
         // Classify the image (in popup context where model is loaded)
         let resultado;
         try {
-            resultado = await classifyImageBySrc(imageSrc);
+            resultado = await classifyImage(imageSrc);
         } catch (err) {
             debugLog("Error clasificando: " + err.message);
             break;
@@ -119,7 +100,7 @@ async function classifyAndDeleteSequentially() {
             await chrome.scripting.executeScript({
                 target: { tabId: tab.id },
                 func: () => {
-                    const confirmBtn = document.querySelector('span.mUIrbf-vQzf8d[jsname="V67aGc"]');
+                    const confirmBtn = document.querySelector('button[data-mdc-dialog-action="EBS5u"]');
                     if (confirmBtn) confirmBtn.click();
                 }
             });

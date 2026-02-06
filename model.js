@@ -82,7 +82,7 @@ function interpretResult(outputData) {
 // - preprocessImage()
 // - showTensorAsImage()
 // - interpretResult()
-async function classifyImageBySrc(imageSrc) {
+async function classifyImage(imageSrc) {
     const model = await loadModel();
     debugLog("Modelo listo. Preprocesando imagen...");
     const tensorData = await preprocessImage(imageSrc);
