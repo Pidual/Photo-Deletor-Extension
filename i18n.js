@@ -46,7 +46,10 @@ const TRANSLATIONS = {
         madeWith: "Made with effort and passion",
         // Help section
         helpTitle: "How to Use",
-        helpText: "Open a photo in Google Photos first. You should see the toolbar with these icons:"
+        helpText: "Open a photo in Google Photos first. You should see the toolbar with these icons:",
+        // Tab status
+        tabValid: "Ready! Photo detected",
+        tabInvalid: "Open a photo in Google Photos"
     },
     es: {
         subtitle: "Limpieza de Fotos con IA",
@@ -90,7 +93,10 @@ const TRANSLATIONS = {
         madeWith: "Hecho con esfuerzo y pasion",
         // Help section
         helpTitle: "Como Usar",
-        helpText: "Abre una foto en Google Photos primero. Debes ver la barra de herramientas con estos iconos:"
+        helpText: "Abre una foto en Google Photos primero. Debes ver la barra de herramientas con estos iconos:",
+        // Tab status
+        tabValid: "Listo! Foto detectada",
+        tabInvalid: "Abre una foto en Google Photos"
     }
 };
 
