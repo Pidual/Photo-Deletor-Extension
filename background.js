@@ -11,7 +11,7 @@ async function loadModel() {
 // Handle messages from popup
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === "classify") {
-        classifyImage(request.imageSrc)
+        classifyImageBySrc(request.imageSrc)
             .then(result => sendResponse({ success: true, data: result }))
             .catch(err => sendResponse({ success: false, error: err.message }));
         return true; // Keep channel open for async response
