@@ -1,6 +1,16 @@
-const SELECTORS = {
-    //Main Photo Container
-    imageClass: 'img.BiCYpc', //image class
+// =============================================================================
+// CONTENT.JS - Google Photos Page Selectors (Reference)
+// =============================================================================
+// Note: These selectors are defined here for reference.
+// The actual DOM manipulation is done via chrome.scripting.executeScript
+// from popup.js to avoid content script injection issues.
+// =============================================================================
+
+const GOOGLE_PHOTOS_SELECTORS = {
+    // Main photo image
+    image: 'img.BiCYpc',
+    
+    // Navigation buttons
     nextButtons: [
         '[aria-label="Ver la foto siguiente"]',
         '[aria-label="Ver siguiente foto"]',
@@ -8,17 +18,8 @@ const SELECTORS = {
         '[aria-label="Siguiente"]',
         '[aria-label="Next"]'
     ],
-    // Icono de basurero
+    
+    // Delete action
     deleteButton: '[aria-label="Mover a la papelera"]',
-    // Confirmar borrar
-    confirmDeleteSpan: 'span.mUIrbf-vQzf8d'
-}
-
-// DOM ACTIONS
-// Document Object Model is a programming interface for web documents. It represents the page so that programs can change the document structure, style, and content.
-
-function getCurrentImageSrc() {
-    const img = document.querySelector(SELECTORS.imageClass);
-    return img ? img.src : null;
-
-}
+    confirmDelete: 'button[data-mdc-dialog-action="EBS5u"]'
+};

@@ -1,47 +1,73 @@
-// This class
-// await is for waiting for the model to load
+// =============================================================================
+// MODEL.JS - ONNX Model & Image Classification
+// =============================================================================
+
+// --- Constants ---------------------------------------------------------------
+const IMAGE_SIZE = 512;
+const NORMALIZATION = {
+    mean: [0.485, 0.456, 0.406],
+    std: [0.229, 0.224, 0.225]
+};
+
+// =============================================================================
+// MODEL LOADING
+// =============================================================================
+
+/**
+ * Loads the ONNX model (singleton pattern)
+ * @returns {Promise<ort.InferenceSession>} The loaded model session
+ */
 async function loadModel() {
     if (model) return model;
-    debugLog("Cargando el modelo...");
-    model = await ort.InferenceSession.create(modelUrl);
-    debugLog("Modelo cargado");
+    
+    debugLog("Cargando modelo...");
+    model = await ort.InferenceSession.create(MODEL_URL);
+    debugLog("Modelo cargado ✓");
+    
     return model;
 }
 
-// Procesa la imagen 
-// 
+// =============================================================================
+// IMAGE PREPROCESSING
+// =============================================================================
+
+/**
+ * Preprocesses an image for the ResNet50 model
+ * @param {string} imageSrc - Image source URL
+ * @returns {Promise<Float32Array>} Normalized tensor data
+ */
 async function preprocessImage(imageSrc) {
     return new Promise((resolve, reject) => {
         const img = new Image();
         img.crossOrigin = "anonymous";
 
         img.onload = () => {
-            const size = 512;
-            const channelSize = size * size;
+            const channelSize = IMAGE_SIZE * IMAGE_SIZE;
             
+            // Create canvas and draw resized image
             const canvas = document.createElement("canvas");
             const ctx = canvas.getContext("2d");
-            canvas.width = size;
-            canvas.height = size;
-            ctx.drawImage(img, 0, 0, size, size);
+            canvas.width = IMAGE_SIZE;
+            canvas.height = IMAGE_SIZE;
+            ctx.drawImage(img, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
 
-            const data = ctx.getImageData(0, 0, size, size).data;         
-
+            // Get pixel data
+            const data = ctx.getImageData(0, 0, IMAGE_SIZE, IMAGE_SIZE).data;
             const tensorData = new Float32Array(3 * channelSize);
 
-            // Un solo loop, sin cálculos redundantes
+            // Convert to CHW format and normalize to [0, 1]
             for (let i = 0; i < channelSize; i++) {
                 const p = i * 4;
-                tensorData[i] = data[p] / 255;
-                tensorData[channelSize + i] = data[p + 1] / 255;
-                tensorData[channelSize * 2 + i] = data[p + 2] / 255;
+                tensorData[i] = data[p] / 255;                          // R
+                tensorData[channelSize + i] = data[p + 1] / 255;        // G
+                tensorData[channelSize * 2 + i] = data[p + 2] / 255;    // B
             }
 
-            const mean = [0.485, 0.456, 0.406];
-            const std = [0.229, 0.224, 0.225];
+            // Apply ImageNet normalization
             for (let c = 0; c < 3; c++) {
                 for (let i = 0; i < channelSize; i++) {
-                    tensorData[c * channelSize + i] = (tensorData[c * channelSize + i] - mean[c]) / std[c];
+                    const idx = c * channelSize + i;
+                    tensorData[idx] = (tensorData[idx] - NORMALIZATION.mean[c]) / NORMALIZATION.std[c];
                 }
             }
 
@@ -53,6 +79,15 @@ async function preprocessImage(imageSrc) {
     });
 }
 
+// =============================================================================
+// RESULT INTERPRETATION
+// =============================================================================
+
+/**
+ * Applies softmax to logits
+ * @param {number[]} logits - Raw model output
+ * @returns {number[]} Probabilities
+ */
 function softmax(logits) {
     const maxVal = Math.max(...logits);
     const exps = logits.map(x => Math.exp(x - maxVal));
@@ -60,56 +95,69 @@ function softmax(logits) {
     return exps.map(x => x / sum);
 }
 
+/**
+ * Interprets model output into classification result
+ * @param {Float32Array} outputData - Model output
+ * @returns {Object} Classification result
+ */
 function interpretResult(outputData) {
     const logits = Array.from(outputData);
     const probs = softmax(logits);
 
-    // INVERTIDO: probs[1] = memorable, probs[0] = olvidable
+    // probs[0] = forgettable, probs[1] = memorable
     const isMemborable = probs[1] > probs[0];
     const confidence = Math.max(probs[0], probs[1]);
 
     return {
         isMemborable,
         confidence,
-        probMemborable: probs[1],  
-        probOlvidable: probs[0]    
+        probMemborable: probs[1],
+        probOlvidable: probs[0]
     };
 }
 
-// CLasificia una imagen
-// Usa funciones definidas arriba:
-// - loadModel()
-// - preprocessImage()
-// - showTensorAsImage()
-// - interpretResult()
+// =============================================================================
+// MAIN CLASSIFICATION
+// =============================================================================
+
+/**
+ * Classifies an image as memorable or forgettable
+ * @param {string} imageSrc - Image source URL
+ * @returns {Promise<Object>} Classification result
+ */
 async function classifyImage(imageSrc) {
+    // Load model
     const model = await loadModel();
-    debugLog("Modelo listo. Preprocesando imagen...");
+    
+    // Preprocess image
+    debugLog("Preprocesando...");
     const tensorData = await preprocessImage(imageSrc);
-    debugLog("Imagen preprocesada");
     showTensorAsImage(tensorData);
 
-    const inputTensor = new ort.Tensor("float32", tensorData, [1, 3, 512, 512]);
+    // Run inference
     debugLog("Ejecutando modelo...");
-    const inputName = model.inputNames[0];
-    const feeds = { [inputName]: inputTensor };
+    const inputTensor = new ort.Tensor("float32", tensorData, [1, 3, IMAGE_SIZE, IMAGE_SIZE]);
+    const feeds = { [model.inputNames[0]]: inputTensor };
     const results = await model.run(feeds);
-    const outputName = model.outputNames[0];
-    const output = results[outputName];
-    debugLog("Logits: " + Array.from(output.data).join(", "));
-    const resultado = interpretResult(output.data);
+    const output = results[model.outputNames[0]];
 
+    // Interpret result
+    const result = interpretResult(output.data);
+    
     debugLog(
-        resultado.isMemborable
-            ? `MEMORABLE (${(resultado.confidence * 100).toFixed(1)}%)`
-            : `OLVIDABLE (${(resultado.confidence * 100).toFixed(1)}%)`
+        result.isMemborable
+            ? `✓ MEMORABLE (${(result.confidence * 100).toFixed(1)}%)`
+            : `✗ OLVIDABLE (${(result.confidence * 100).toFixed(1)}%)`
     );
-    return resultado;
+
+    return result;
 }
 
-//window. para compartir las funciones con popup.js
+// =============================================================================
+// EXPORTS (for popup.js)
+// =============================================================================
 window.loadModel = loadModel;
 window.preprocessImage = preprocessImage;
 window.softmax = softmax;
 window.interpretResult = interpretResult;
-window.classifyImageBySrc = classifyImageBySrc;
+window.classifyImage = classifyImage;

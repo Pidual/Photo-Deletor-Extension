@@ -1,20 +1,52 @@
-// --- ONNX Runtime config ---
+// =============================================================================
+// POPUP.JS - Main Extension Controller
+// =============================================================================
+
+// --- Configuration -----------------------------------------------------------
 ort.env.wasm.numThreads = 1;
 ort.env.wasm.proxy = false;
 
-// --- Model Functions ---
-const modelUrl = chrome.runtime.getURL('model/resnet50_classifier.onnx');
+const MODEL_URL = chrome.runtime.getURL('model/resnet50_classifier.onnx');
+const DELAYS = {
+    confirmDialog: 500,
+    afterAction: 1000
+};
+
+// --- State -------------------------------------------------------------------
 let model = null;
 
-// --- Main Event Handlers ---
+// --- Selectors (Google Photos) -----------------------------------------------
+const SELECTORS = {
+    image: 'img.BiCYpc',
+    deleteButton: '[aria-label="Mover a la papelera"]',
+    confirmDelete: 'button[data-mdc-dialog-action="EBS5u"]',
+    nextButtons: [
+        '[aria-label="Ver la foto siguiente"]',
+        '[aria-label="Ver siguiente foto"]',
+        '[aria-label="View next photo"]',
+        '[aria-label="Siguiente"]',
+        '[aria-label="Next"]'
+    ]
+};
+
+// --- Event Listeners ---------------------------------------------------------
 document.getElementById("classifyBtn").addEventListener("click", classifyCurrentImage);
 document.getElementById("sequentialBtn").addEventListener("click", classifyAndDeleteSequentially);
 
+// =============================================================================
+// IMAGE DETECTION
+// =============================================================================
+
+/**
+ * Gets the visible image src from the active tab
+ * @param {number} tabId - Chrome tab ID
+ * @returns {Promise<string|null>} Image source URL or null
+ */
 async function getCurrentImageSrc(tabId) {
     const [{ result: imageSrc }] = await chrome.scripting.executeScript({
-        target: { tabId: tabId },
+        target: { tabId },
         func: () => {
-            const isVisible = img => {
+            const isVisible = (img) => {
                 const rect = img.getBoundingClientRect();
                 const style = window.getComputedStyle(img);
                 return (
@@ -41,103 +73,131 @@ async function getCurrentImageSrc(tabId) {
     return imageSrc;
 }
 
-// --- Handler Implementations ---
-async function classifyCurrentImage() {
-    debugLog("classifyBtn presionado");
-    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+// =============================================================================
+// PAGE ACTIONS
+// =============================================================================
 
+/**
+ * Clicks the delete button on the current photo
+ */
+async function clickDeleteButton(tabId) {
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (selector) => {
+            const btn = document.querySelector(selector);
+            if (btn) btn.click();
+        },
+        args: [SELECTORS.deleteButton]
+    });
+}
+
+/**
+ * Clicks the confirm delete button in the dialog
+ */
+async function clickConfirmDelete(tabId) {
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (selector) => {
+            const btn = document.querySelector(selector);
+            if (btn) btn.click();
+        },
+        args: [SELECTORS.confirmDelete]
+    });
+}
+
+/**
+ * Clicks the next photo button
+ */
+async function clickNextPhoto(tabId) {
+    await chrome.scripting.executeScript({
+        target: { tabId },
+        func: (selectors) => {
+            for (const sel of selectors) {
+                const btn = document.querySelector(sel);
+                if (btn) {
+                    btn.click();
+                    return true;
+                }
+            }
+            return false;
+        },
+        args: [SELECTORS.nextButtons]
+    });
+}
+
+/**
+ * Utility: wait for specified milliseconds
+ */
+const wait = (ms) => new Promise(resolve => setTimeout(resolve, ms));
+
+// =============================================================================
+// MAIN HANDLERS
+// =============================================================================
+
+/**
+ * Classifies the currently visible photo
+ */
+async function classifyCurrentImage() {
+    debugLog("Clasificando foto actual...");
+    
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
     const imageSrc = await getCurrentImageSrc(tab.id);
+    
     if (!imageSrc) return;
 
-    debugLog("Imagen encontrada: " + imageSrc);
-
+    debugLog("Imagen: " + imageSrc.substring(0, 60) + "...");
     await classifyImage(imageSrc);
 }
 
+/**
+ * Sequentially classifies and deletes forgettable photos
+ */
 async function classifyAndDeleteSequentially() {
-    const countInput = document.getElementById("countInput");
-    const count = parseInt(countInput.value, 10) || 10;
+    const count = parseInt(document.getElementById("countInput").value, 10) || 10;
     
-    debugLog(`Iniciando clasificación secuencial de ${count} fotos...`);
+    debugLog(`=== Iniciando: ${count} fotos ===`);
     
     const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    
+    let deleted = 0;
+    let kept = 0;
 
     for (let i = 0; i < count; i++) {
-        debugLog(`--- Procesando foto ${i + 1} de ${count} ---`);
+        debugLog(`--- Foto ${i + 1}/${count} ---`);
 
-        // Get current image src from the page
         const imageSrc = await getCurrentImageSrc(tab.id);
         if (!imageSrc) break;
 
-        debugLog("Imagen encontrada: " + imageSrc.substring(0, 50) + "...");
-
-        // Classify the image (in popup context where model is loaded)
-        let resultado;
+        // Classify
+        let result;
         try {
-            resultado = await classifyImage(imageSrc);
+            result = await classifyImage(imageSrc);
         } catch (err) {
-            debugLog("Error clasificando: " + err.message);
+            debugLog("Error: " + err.message);
             break;
         }
 
-        if (!resultado.isMemborable) {
-            // Image is forgettable - DELETE IT
-            debugLog("Foto OLVIDABLE - Borrando...");
+        if (!result.isMemborable) {
+            // FORGETTABLE - Delete
+            debugLog("→ OLVIDABLE - Borrando...");
             
-            // Click delete button
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => {
-                    const deleteBtn = document.querySelector('[aria-label="Mover a la papelera"]');
-                    if (deleteBtn) deleteBtn.click();
-                }
-            });
-
-            // Wait for confirmation dialog
-            await new Promise(r => setTimeout(r, 500));
-
-            // Click confirm delete button ("Mover a la papelera" in dialog)
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => {
-                    const confirmBtn = document.querySelector('button[data-mdc-dialog-action="EBS5u"]');
-                    if (confirmBtn) confirmBtn.click();
-                }
-            });
-
-            debugLog("Foto borrada, esperando...");
-            await new Promise(r => setTimeout(r, 1000));
-
+            await clickDeleteButton(tab.id);
+            await wait(DELAYS.confirmDialog);
+            await clickConfirmDelete(tab.id);
+            await wait(DELAYS.afterAction);
+            
+            deleted++;
         } else {
-            // Image is memorable - KEEP IT, go to next
-            debugLog("Foto MEMORABLE - Manteniendo, siguiente...");
+            // MEMORABLE - Keep and go next
+            debugLog("→ MEMORABLE - Siguiente...");
             
-            // Click next button
-            await chrome.scripting.executeScript({
-                target: { tabId: tab.id },
-                func: () => {
-                    const nextSelectors = [
-                        '[aria-label="Ver la foto siguiente"]',
-                        '[aria-label="Ver siguiente foto"]',
-                        '[aria-label="View next photo"]',
-                        '[aria-label="Siguiente"]',
-                        '[aria-label="Next"]'
-                    ];
-                    for (const sel of nextSelectors) {
-                        const btn = document.querySelector(sel);
-                        if (btn) {
-                            btn.click();
-                            return true;
-                        }
-                    }
-                    return false;
-                }
-            });
-
-            await new Promise(r => setTimeout(r, 1000));
+            await clickNextPhoto(tab.id);
+            await wait(DELAYS.afterAction);
+            
+            kept++;
         }
     }
 
-    debugLog("=== Clasificación secuencial completada ===");
+    debugLog(`=== Completado: ${deleted} borradas, ${kept} conservadas ===`);
 }
 
