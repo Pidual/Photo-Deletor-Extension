@@ -22,7 +22,7 @@ async function loadModel() {
     
     debugLog("Cargando modelo...");
     model = await ort.InferenceSession.create(MODEL_URL);
-    debugLog("Modelo cargado ✓");
+    debugLog("Modelo cargado ");
     
     return model;
 }
@@ -146,8 +146,8 @@ async function classifyImage(imageSrc) {
     
     debugLog(
         result.isMemborable
-            ? `✓ MEMORABLE (${(result.confidence * 100).toFixed(1)}%)`
-            : `✗ OLVIDABLE (${(result.confidence * 100).toFixed(1)}%)`
+            ? `[MEMORABLE] (${(result.confidence * 100).toFixed(1)}%)`
+            : `[FORGETTABLE] (${(result.confidence * 100).toFixed(1)}%)`
     );
 
     return result;

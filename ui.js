@@ -81,10 +81,10 @@ function showResultBadge(isMemborable, confidence) {
     const deleteText = typeof t === 'function' ? t('delete') : 'DELETE';
     
     if (isMemborable) {
-        resultDiv.textContent = `✓ ${keepText} (${percent}%)`;
+        resultDiv.textContent = `${keepText} (${percent}%)`;
         resultDiv.className = "result-memorable";
     } else {
-        resultDiv.textContent = `✗ ${deleteText} (${percent}%)`;
+        resultDiv.textContent = `${deleteText} (${percent}%)`;
         resultDiv.className = "result-forgettable";
     }
     

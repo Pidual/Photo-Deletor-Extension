@@ -81,7 +81,7 @@ function updateTabStatus(isValid, url) {
                 <span data-i18n="tabValid">Ready! Photo detected</span>
             `;
         }
-        debugLog("✓ Valid Google Photos tab detected");
+        debugLog("Valid Google Photos tab detected");
     } else {
         // Invalid tab - disable buttons
         classifyBtn.disabled = true;
@@ -96,7 +96,7 @@ function updateTabStatus(isValid, url) {
                 <span data-i18n="tabInvalid">Open a photo in Google Photos</span>
             `;
         }
-        debugLog("✗ Not a Google Photos photo view");
+        debugLog("Not a Google Photos photo view");
     }
     
     // Re-apply translations if available
@@ -139,7 +139,7 @@ async function getCurrentImageSrc(tabId) {
     });
 
     if (!imageSrc) {
-        debugLog("No se encontró imagen visible");
+        debugLog("No se encontro imagen visible");
     }
 
     return imageSrc;
@@ -262,7 +262,7 @@ async function classifyAndDeleteSequentially() {
 
         if (!result.isMemborable) {
             // FORGETTABLE - Delete
-            debugLog("→ OLVIDABLE - Borrando...");
+            debugLog("-> OLVIDABLE - Borrando...");
             
             await clickDeleteButton(tab.id);
             await wait(DELAYS.confirmDialog);
@@ -272,7 +272,7 @@ async function classifyAndDeleteSequentially() {
             deleted++;
         } else {
             // MEMORABLE - Keep and go next
-            debugLog("→ MEMORABLE - Siguiente...");
+            debugLog("-> MEMORABLE - Siguiente...");
             
             await clickNextPhoto(tab.id);
             await wait(DELAYS.afterAction);
