@@ -8,8 +8,15 @@ ort.env.wasm.proxy = false;
 
 const MODEL_URL = chrome.runtime.getURL('model/resnet50_fine_tunned_classifier.onnx');
 const DELAYS = {
-    confirmDialog: 500,
-    afterAction: 1000
+    confirmDialog: 300,
+    imageRetry: 400,
+    afterDelete: 800,
+    afterNext: 400
+};
+
+const RETRY = {
+    maxAttempts: 5,
+    maxSkips: 10  // Max consecutive failures before stopping
 };
 
 // --- State -------------------------------------------------------------------
@@ -114,7 +121,7 @@ function updateTabStatus(isValid, url) {
  * @param {number} tabId - Chrome tab ID
  * @returns {Promise<string|null>} Image source URL or null
  */
-async function getCurrentImageSrc(tabId) {
+async function getCurrentImageSrc(tabId, attempt = 1) {
     const [{ result: imageSrc }] = await chrome.scripting.executeScript({
         target: { tabId },
         func: () => {
@@ -138,11 +145,54 @@ async function getCurrentImageSrc(tabId) {
         }
     });
 
+    // Retry logic if image not found
+    if (!imageSrc && attempt < RETRY.maxAttempts) {
+        debugLog(`[Retry ${attempt}/${RETRY.maxAttempts}] Waiting for image...`);
+        await wait(DELAYS.imageRetry);
+        return getCurrentImageSrc(tabId, attempt + 1);
+    }
+
     if (!imageSrc) {
-        debugLog("No se encontro imagen visible");
+        debugLog(`[Warning] No image found after ${RETRY.maxAttempts} attempts`);
     }
 
     return imageSrc;
+}
+
+/**
+ * Waits for the image to change from the previous one
+ * @param {number} tabId - Chrome tab ID
+ * @param {string} previousSrc - Previous image URL to compare against
+ * @returns {Promise<string|null>} New image source URL or null
+ */
+async function waitForImageChange(tabId, previousSrc) {
+    // First wait a bit for the transition to start
+    await wait(DELAYS.afterNext);
+    
+    for (let attempt = 1; attempt <= RETRY.maxAttempts; attempt++) {
+        // Get raw image without retry (we handle retry here)
+        const [{ result: currentSrc }] = await chrome.scripting.executeScript({
+            target: { tabId },
+            func: () => {
+                const img = document.querySelector('img.BiCYpc');
+                return img ? img.src : null;
+            }
+        });
+        
+        // Success: found a different image
+        if (currentSrc && currentSrc !== previousSrc) {
+            return currentSrc;
+        }
+        
+        if (attempt < RETRY.maxAttempts) {
+            debugLog(`[Sync ${attempt}/${RETRY.maxAttempts}] Waiting for new image...`);
+            await wait(DELAYS.imageRetry);
+        }
+    }
+    
+    // Fallback: return current image (might be same if last photo or stuck)
+    debugLog(`[Warning] Image may not have changed`);
+    return await getCurrentImageSrc(tabId);
 }
 
 // =============================================================================
@@ -237,6 +287,9 @@ async function classifyAndDeleteSequentially() {
     
     let deleted = 0;
     let kept = 0;
+    let skipped = 0;
+    let consecutiveFailures = 0;
+    let lastImageSrc = null;  // Track last processed image
 
     // Show stats bar
     updateStats(0, count, kept, deleted);
@@ -245,16 +298,38 @@ async function classifyAndDeleteSequentially() {
         debugLog(`--- Foto ${i + 1}/${count} ---`);
         updateStats(i + 1, count, kept, deleted);
 
-        const imageSrc = await getCurrentImageSrc(tab.id);
-        if (!imageSrc) break;
+        // Get image - if we have a lastImageSrc, wait for it to change first
+        let imageSrc;
+        if (lastImageSrc) {
+            imageSrc = await waitForImageChange(tab.id, lastImageSrc);
+        } else {
+            imageSrc = await getCurrentImageSrc(tab.id);
+        }
+        
+        if (!imageSrc) {
+            consecutiveFailures++;
+            skipped++;
+            debugLog(`[Skip] No image found (${consecutiveFailures}/${RETRY.maxSkips})`);
+            
+            // Stop if too many consecutive failures
+            if (consecutiveFailures >= RETRY.maxSkips) {
+                debugLog(`[Stop] Too many consecutive failures`);
+                break;
+            }
+            continue;
+        }
+        
+        // Reset consecutive failures on success
+        consecutiveFailures = 0;
 
-        // Classify
+        // Classify with error handling
         let result;
         try {
             result = await classifyImage(imageSrc);
         } catch (err) {
-            debugLog("Error: " + err.message);
-            break;
+            debugLog(`[Error] Classification failed: ${err.message}`);
+            skipped++;
+            continue;
         }
 
         // Show result badge
@@ -264,18 +339,24 @@ async function classifyAndDeleteSequentially() {
             // FORGETTABLE - Delete
             debugLog("-> OLVIDABLE - Borrando...");
             
-            await clickDeleteButton(tab.id);
-            await wait(DELAYS.confirmDialog);
-            await clickConfirmDelete(tab.id);
-            await wait(DELAYS.afterAction);
-            
-            deleted++;
+            try {
+                await clickDeleteButton(tab.id);
+                await wait(DELAYS.confirmDialog);
+                await clickConfirmDelete(tab.id);
+                await wait(DELAYS.afterDelete);
+                deleted++;
+                lastImageSrc = imageSrc;  // Track so we wait for change
+                // Note: Google Photos auto-advances after delete
+            } catch (err) {
+                debugLog(`[Error] Delete failed: ${err.message}`);
+                lastImageSrc = null;  // Reset on error
+            }
         } else {
             // MEMORABLE - Keep and go next
             debugLog("-> MEMORABLE - Siguiente...");
             
+            lastImageSrc = imageSrc;  // Track current before clicking next
             await clickNextPhoto(tab.id);
-            await wait(DELAYS.afterAction);
             
             kept++;
         }
@@ -284,6 +365,8 @@ async function classifyAndDeleteSequentially() {
         updateStats(i + 1, count, kept, deleted);
     }
 
-    debugLog(`=== Completado: ${deleted} borradas, ${kept} conservadas ===`);
+    const summary = `=== Completado: ${deleted} borradas, ${kept} conservadas` + 
+                    (skipped > 0 ? `, ${skipped} omitidas ===` : ` ===`);
+    debugLog(summary);
 }
 
