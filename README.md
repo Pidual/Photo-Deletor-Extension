@@ -1,3 +1,7 @@
+
+
+https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
+
 # Photo Deleter for Google Photos
 
 A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
@@ -11,7 +15,6 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 ## Features
 
 
-https://github.com/user-attachments/assets/de978827-5daa-43be-842a-039a9fc847e7
 
 
 
