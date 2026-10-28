@@ -1,6 +1,7 @@
 <!DOCTYPE html>
 <html>
 <head>
+    <meta charset="utf-8">
     <link rel="stylesheet" href="popup.css">
 </head>
 
@@ -17,7 +18,7 @@
             <span id="langES">ES</span>
         </div>
         <button class="info-btn" id="infoBtn" title="About">
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
                 <circle cx="12" cy="12" r="10"/>
                 <line x1="12" y1="16" x2="12" y2="12"/>
                 <circle cx="12" cy="8" r="1"/>
@@ -34,9 +35,14 @@
             </div>
             <div class="modal-content">
                 <div class="modal-section">
+                    <h3 data-i18n="howItWorks">How It Works</h3>
+                    <p data-i18n="howItWorksText"></p>
+                </div>
+
+                <div class="modal-section">
                     <h3 data-i18n="devNotes">Developer Notes</h3>
-                    <p data-i18n="devNotesText">This extension runs a full neural network locally in your browser - no cloud, no API calls, complete privacy!</p>
-                    <p><span data-i18n="modelSize">Model size:</span> <span class="stat-highlight">~260 MB</span></p>
+                    <p data-i18n="devNotesText"></p>
+                    <p><span data-i18n="modelSize">Model size:</span> <span class="stat-highlight">~94 MB</span></p>
                     <p><span data-i18n="modelType">Model:</span> <span class="stat-highlight">Fine-tuned ResNet50</span></p>
                 </div>
 
@@ -50,11 +56,6 @@
                     </div>
                 </div>
 
-                <div class="modal-section">
-                    <h3 data-i18n="howItWorks">How It Works</h3>
-                    <p data-i18n="howItWorksText">The AI analyzes each photo and classifies it as "memorable" or "forgettable" based on visual features. Forgettable photos (blurry, duplicates, low quality) are moved to trash automatically.</p>
-                </div>
-
                 <div class="credits">
                     <p data-i18n="madeWith">Made with effort and passion</p>
                     <p><a href="https://github.com/Pidual" target="_blank">GitHub: @Pidual</a></p>
@@ -63,148 +64,75 @@
         </div>
     </div>
 
-    <!-- Tab Status Indicator -->
-    <div id="tabStatus" class="tab-status invalid">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/>
-        </svg>
-        <span data-i18n="tabInvalid">Open a photo in Google Photos</span>
+    <!-- Setup: shown until a photo is open in Google Photos -->
+    <div id="setupCard" class="card setup-card">
+        <p id="setupText" class="setup-text"></p>
+        <button id="setupBtn" class="btn btn-secondary"></button>
     </div>
 
-    <!-- Warning -->
-    <div class="warning">
-        <svg class="warning-icon" width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M12 2L1 21h22L12 2zm0 3.5L19.5 19h-15L12 5.5zM11 10v4h2v-4h-2zm0 6v2h2v-2h-2z"/>
-        </svg>
-        <span data-i18n="warning">This will automatically delete photos marked as forgettable. Photos move to trash and can be recovered within 30 days.</span>
-    </div>
-
-    <!-- Help Section -->
-    <div class="help-section">
-        <div class="help-header">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
-            </svg>
-            <span data-i18n="helpTitle">How to Use</span>
-        </div>
-        <p class="help-text" data-i18n="helpText">Open a photo in Google Photos first. You should see the toolbar with these icons:</p>
-        <div class="help-icons">
-            <!-- Left arrow (back) -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
-                </svg>
-                <span class="icon-label">Back</span>
-            </div>
-            <!-- Spacer for image area -->
-            <div class="icon-spacer"></div>
-            <!-- Share -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="18" cy="5" r="3"/><circle cx="6" cy="12" r="3"/><circle cx="18" cy="19" r="3"/>
-                    <line x1="8.59" y1="13.51" x2="15.42" y2="17.49"/><line x1="15.41" y1="6.51" x2="8.59" y2="10.49"/>
-                </svg>
-                <span class="icon-label">Share</span>
-            </div>
-            <!-- Zoom -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/><line x1="11" y1="8" x2="11" y2="14"/><line x1="8" y1="11" x2="14" y2="11"/>
-                </svg>
-                <span class="icon-label">Zoom</span>
-            </div>
-            <!-- Info -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <circle cx="12" cy="12" r="10"/>
-                    <line x1="12" y1="16" x2="12" y2="12"/>
-                    <circle cx="12" cy="8" r="1"/>
-                </svg>
-                <span class="icon-label">Info</span>
-            </div>
-            <!-- Star -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
-                </svg>
-                <span class="icon-label">Star</span>
-            </div>
-            <!-- Trash (highlighted) -->
-            <div class="icon-group icon-highlight">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                    <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                </svg>
-                <span class="icon-label" style="color: #4a9eff;">Trash</span>
-            </div>
-            <!-- More (three dots) -->
-            <div class="icon-group">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-                    <circle cx="12" cy="5" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="12" cy="19" r="2"/>
-                </svg>
-                <span class="icon-label">More</span>
+    <!-- Controls: shown when a photo is open -->
+    <div id="controlsCard" class="card">
+        <div class="field">
+            <label for="countInput" data-i18n="howMany">How many photos to check</label>
+            <div class="count-row">
+                <input id="countInput" type="number" min="1" max="5000" value="25"/>
+                <button class="chip" data-count="25">25</button>
+                <button class="chip" data-count="100">100</button>
+                <button class="chip" data-count="500">500</button>
             </div>
         </div>
-    </div>
 
-    <!-- Controls -->
-    <div class="controls">
-        <button id="classifyBtn" class="btn btn-secondary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/>
-            </svg>
-            <span data-i18n="classifyBtn">Classify Current Photo</span>
-        </button>
-
-        <div class="input-group">
-            <label for="countInput" data-i18n="photosToProcess">Photos to process:</label>
-            <input id="countInput" type="number" min="1" value="10"/>
+        <div class="field">
+            <label for="thresholdInput">
+                <span data-i18n="thresholdLabel">Only delete when the AI is at least</span>
+                <strong id="thresholdValue">80%</strong>
+                <span data-i18n="thresholdSuffix">sure</span>
+            </label>
+            <input id="thresholdInput" type="range" min="50" max="99" step="1" value="80"/>
+            <div class="range-hints">
+                <span data-i18n="moreDeletes">Delete more</span>
+                <span data-i18n="safer">Safer</span>
+            </div>
         </div>
 
         <button id="sequentialBtn" class="btn btn-primary">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M3 6h18M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-            </svg>
-            <span data-i18n="startAutoDelete">Start Auto-Delete</span>
+            <span data-i18n="startAutoDelete">Start cleaning</span>
         </button>
+        <p class="fineprint" data-i18n="trashNote">Deleted photos go to Google Photos Trash, where you can restore them.</p>
+        <button id="classifyBtn" class="link-btn" data-i18n="classifyBtn">Test on this photo (won't delete)</button>
     </div>
 
-    <!-- Stats Bar -->
-    <div id="statsBar" class="stats-bar">
-        <div class="stat stat-progress">
-            <div class="stat-value" id="statProgress">0/0</div>
-            <div class="stat-label" data-i18n="progress">Progress</div>
+    <!-- Run: status, progress and the last photo checked -->
+    <div id="runCard" class="card run-card">
+        <div class="status-line">
+            <img id="thumb" class="thumb" alt="" />
+            <span id="spinner" class="spinner"></span>
+            <span id="statusText"></span>
         </div>
-        <div class="stat stat-kept">
-            <div class="stat-value" id="statKept">0</div>
-            <div class="stat-label" data-i18n="kept">Kept</div>
+        <div class="progress"><div id="progressFill" class="progress-fill"></div></div>
+        <div class="stats">
+            <div class="stat"><div class="stat-value" id="statProgress">0/0</div><div class="stat-label" data-i18n="checked">Checked</div></div>
+            <div class="stat stat-kept"><div class="stat-value" id="statKept">0</div><div class="stat-label" data-i18n="kept">Kept</div></div>
+            <div class="stat stat-deleted"><div class="stat-value" id="statDeleted">0</div><div class="stat-label" data-i18n="deleted">Deleted</div></div>
+            <div class="stat stat-skipped"><div class="stat-value" id="statSkipped">0</div><div class="stat-label" data-i18n="skipped">Skipped</div></div>
         </div>
-        <div class="stat stat-deleted">
-            <div class="stat-value" id="statDeleted">0</div>
-            <div class="stat-label" data-i18n="deleted">Deleted</div>
-        </div>
-    </div>
-
-    <!-- Preview Section -->
-    <div class="preview-section">
-        <div class="preview-container">
-            <span class="preview-placeholder" data-i18n="previewPlaceholder">Photo preview will appear here</span>
-            <img id="preview" />
-            <div id="result"></div>
+        <div id="deletedSection" class="deleted-section">
+            <div class="deleted-title">
+                <span data-i18n="deletedThisRun">Deleted this run</span>
+                <span id="deletedCount"></span>
+            </div>
+            <div id="deletedStrip" class="deleted-strip"></div>
         </div>
     </div>
 
-    <!-- Debug Console -->
-    <div class="debug-section">
-        <div class="debug-header">
-            <span class="debug-title" data-i18n="console">Console</span>
-        </div>
+    <!-- Activity log (collapsed by default) -->
+    <details class="debug-section">
+        <summary data-i18n="console">Details</summary>
         <div id="debug"></div>
-    </div>
+    </details>
 
-    <script src="ort/ort.min.js"></script>
     <script src="i18n.js"></script>
-    <script src="model.js"></script>
-    <script src="popup.js"></script>
     <script src="ui.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>

@@ -12,7 +12,7 @@
  */
 function debugLog(msg) {
     console.log(msg);
-    
+
     const debugDiv = document.getElementById("debug");
     if (debugDiv) {
         debugDiv.textContent += msg + "\n";
@@ -21,120 +21,108 @@ function debugLog(msg) {
 }
 
 // =============================================================================
-// IMAGE VISUALIZATION
-// =============================================================================
-
-/**
- * Displays tensor data as a preview image
- * @param {Float32Array} tensorData - Preprocessed image tensor
- * @param {number} size - Image dimensions (default 512)
- */
-function showTensorAsImage(tensorData, size = 512) {
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    
-    const ctx = canvas.getContext("2d");
-    const imageData = ctx.createImageData(size, size);
-    const data = imageData.data;
-
-    // Convert CHW tensor back to RGBA image
-    for (let i = 0; i < size * size; i++) {
-        data[i * 4]     = Math.round(tensorData[i] * 255);                    // R
-        data[i * 4 + 1] = Math.round(tensorData[size * size + i] * 255);      // G
-        data[i * 4 + 2] = Math.round(tensorData[2 * size * size + i] * 255);  // B
-        data[i * 4 + 3] = 255;                                                 // A
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    
-    const preview = document.getElementById("preview");
-    const placeholder = document.querySelector(".preview-placeholder");
-    
-    if (preview) {
-        preview.src = canvas.toDataURL();
-        preview.style.display = "block";
-    }
-    
-    if (placeholder) {
-        placeholder.style.display = "none";
-    }
-}
-
-// =============================================================================
 // RESULT DISPLAY
 // =============================================================================
 
 /**
- * Shows the classification result badge on the preview
- * @param {boolean} isMemborable - Whether the image is memorable
- * @param {number} confidence - Confidence percentage (0-1)
+ * Renders text where **words** are shown in bold, without using innerHTML
+ * @param {HTMLElement} el - Target element
+ * @param {string} text - Text with optional **bold** markers
+ * @param {string} boldClass - Class for the bold parts
  */
-function showResultBadge(isMemborable, confidence) {
-    const resultDiv = document.getElementById("result");
-    if (!resultDiv) return;
-
-    const percent = (confidence * 100).toFixed(0);
-    
-    // Use translations if available
-    const keepText = typeof t === 'function' ? t('keep') : 'KEEP';
-    const deleteText = typeof t === 'function' ? t('delete') : 'DELETE';
-    
-    if (isMemborable) {
-        resultDiv.textContent = `${keepText} (${percent}%)`;
-        resultDiv.className = "result-memorable";
-    } else {
-        resultDiv.textContent = `${deleteText} (${percent}%)`;
-        resultDiv.className = "result-forgettable";
-    }
-    
-    resultDiv.style.display = "block";
+function renderRichText(el, text, boldClass = "") {
+    el.textContent = "";
+    text.split(/\*\*(.+?)\*\*/).forEach((part, i) => {
+        if (i % 2 === 0) {
+            el.append(part);
+        } else {
+            const strong = document.createElement("strong");
+            strong.textContent = part;
+            if (boldClass) strong.className = boldClass;
+            el.append(strong);
+        }
+    });
 }
 
 /**
- * Hides the result badge
+ * Shows a thumbnail of the photo being scored, outlined by its verdict
+ * @param {string|null} imageSrc - Thumbnail data URL
+ * @param {string} verdictClass - "verdict-keep", "verdict-delete" or ""
  */
-function hideResultBadge() {
-    const resultDiv = document.getElementById("result");
-    if (resultDiv) {
-        resultDiv.style.display = "none";
+function renderThumb(imageSrc, verdictClass) {
+    const thumb = document.getElementById("thumb");
+    if (!imageSrc) {
+        thumb.classList.remove("visible");
+        return;
     }
+    if (thumb.src !== imageSrc) thumb.src = imageSrc;
+    thumb.className = `thumb visible ${verdictClass}`;
+}
+
+/**
+ * Shows thumbnails of the photos deleted this run, newest first
+ * @param {string[]} thumbs - Thumbnail data URLs
+ */
+function renderDeleted(thumbs = []) {
+    const section = document.getElementById("deletedSection");
+    const strip = document.getElementById("deletedStrip");
+
+    section.classList.toggle("visible", thumbs.length > 0);
+    document.getElementById("deletedCount").textContent = thumbs.length;
+
+    // Only rebuild when something was added
+    if (strip.childElementCount === thumbs.length) return;
+    strip.textContent = "";
+    thumbs.forEach(src => {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "";
+        img.loading = "lazy";
+        strip.append(img);
+    });
 }
 
 // =============================================================================
-// STATS BAR
+// RUN CARD
 // =============================================================================
 
 /**
- * Shows and updates the stats bar
- * @param {number} current - Current photo number
- * @param {number} total - Total photos to process
- * @param {number} kept - Photos kept
- * @param {number} deleted - Photos deleted
+ * Renders status, progress, stats and preview for the current/last job
+ * @param {Object} state - Job state from the background
  */
-function updateStats(current, total, kept, deleted) {
-    const statsBar = document.getElementById("statsBar");
-    const statProgress = document.getElementById("statProgress");
-    const statKept = document.getElementById("statKept");
-    const statDeleted = document.getElementById("statDeleted");
-    
-    if (statsBar) {
-        statsBar.classList.add("active");
+function renderRun(state) {
+    const runCard = document.getElementById("runCard");
+    if (!state.status) {
+        runCard.classList.remove("visible");
+        return;
     }
-    
-    if (statProgress) statProgress.textContent = `${current}/${total}`;
-    if (statKept) statKept.textContent = kept;
-    if (statDeleted) statDeleted.textContent = deleted;
-}
+    runCard.classList.add("visible");
 
-/**
- * Hides the stats bar
- */
-function hideStats() {
-    const statsBar = document.getElementById("statsBar");
-    if (statsBar) {
-        statsBar.classList.remove("active");
+    // Status line
+    const statusLine = runCard.querySelector(".status-line");
+    statusLine.classList.toggle("error", state.status.kind === "error");
+    statusLine.classList.toggle("success", state.status.kind === "done");
+    document.getElementById("spinner").classList.toggle("visible", state.running);
+
+    // Verdict: bold KEEP/DELETE and a thumbnail of the photo that was scored
+    const verdictClass = !state.lastResult ? ""
+                       : state.lastResult.willDelete ? "verdict-delete" : "verdict-keep";
+    renderRichText(document.getElementById("statusText"), t(state.status.key, state.status.params), verdictClass);
+    renderThumb(state.previewSrc, verdictClass);
+
+    // Progress and stats only make sense for a cleaning run
+    const isClean = state.mode === "clean";
+    runCard.querySelector(".progress").style.display = isClean ? "block" : "none";
+    runCard.querySelector(".stats").style.display = isClean ? "flex" : "none";
+    if (isClean) {
+        const percent = state.total ? (state.current / state.total) * 100 : 0;
+        document.getElementById("progressFill").style.width = `${percent}%`;
+        document.getElementById("statProgress").textContent = `${state.current}/${state.total}`;
+        document.getElementById("statKept").textContent = state.kept;
+        document.getElementById("statDeleted").textContent = state.deleted;
+        document.getElementById("statSkipped").textContent = state.skipped;
     }
+    renderDeleted(state.deletedThumbs);
 }
 
 // =============================================================================
@@ -174,12 +162,4 @@ document.addEventListener('DOMContentLoaded', initInfoModal);
 // EXPORTS (for other scripts)
 // =============================================================================
 window.debugLog = debugLog;
-window.showTensorAsImage = showTensorAsImage;
-window.showResultBadge = showResultBadge;
-window.hideResultBadge = hideResultBadge;
-window.updateStats = updateStats;
-window.hideStats = hideStats;
-
-
-
-
+window.renderRun = renderRun;
