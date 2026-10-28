@@ -1,4 +1,7 @@
 # Photo Deleter for Google Photos
+
+
+!!! El entrenamiento fue hecho en otro repositorio este es solo dedicado a la extension donde se aloja el modelo Entrenamiento https://github.com/Pidual/Photo-Deletor-Model-Training !!!
 <img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
 
