@@ -1,5 +1,5 @@
 # Photo Deleter for Google Photos
-
+<img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
 
 No cloud, no API calls, no accounts: your photos never leave your computer.
@@ -8,7 +8,10 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 Watch the full demo on YouTube 
 Full Demo: https://youtu.be/rt3Lrnmz_Lc
 
-<img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
+
+https://github.com/user-attachments/assets/0e008300-4f26-4b62-9c40-f941e50bbda1
+
+
 
 ## Features
 
