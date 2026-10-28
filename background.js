@@ -57,8 +57,9 @@ const state = {
     kept: 0,
     deleted: 0,
     skipped: 0,
-    previewSrc: null,
+    previewSrc: null,    // Thumbnail (data URL) of the last photo classified
     lastResult: null,
+    deletedThumbs: [],   // Thumbnails deleted this run, newest first
     log: []
 };
 
@@ -156,12 +157,13 @@ async function runExclusive(mode, job) {
         deleted: 0,
         skipped: 0,
         previewSrc: null,
-        lastResult: null
+        lastResult: null,
+        deletedThumbs: []
     });
     setStatus("statusFinding");
 
     // Extension API calls reset the idle timer; this covers long model loads
-    const keepAlive = setInterval(chrome.runtime.getPlatformInfo, KEEPALIVE_INTERVAL);
+    const keepAlive = setInterval(() => chrome.runtime.getPlatformInfo(), KEEPALIVE_INTERVAL);
     try {
         await job();
     } catch (err) {
@@ -246,6 +248,7 @@ function decide(result, threshold) {
         isMemborable: result.isMemborable,
         confidence: result.confidence,
         probOlvidable: result.probOlvidable,
+        thumbnail: result.thumbnail,
         willDelete
     };
 }
@@ -256,30 +259,58 @@ function decide(result, threshold) {
 
 /**
  * Reads the photo currently shown in the tab
- * @returns {Promise<{url: string, src: string|null, isVideo: boolean}>}
+ * @returns {Promise<{url: string, src: string|null, isVideo: boolean, debug: string}>}
  */
 async function readPhoto(tabId) {
     const [{ result }] = await chrome.scripting.executeScript({
         target: { tabId },
         func: (imageSelector) => {
-            const isVisible = (el) => {
-                const rect = el.getBoundingClientRect();
-                const style = window.getComputedStyle(el);
-                return (
-                    rect.width > 0 &&
-                    rect.height > 0 &&
-                    style.display !== "none" &&
-                    style.visibility !== "hidden" &&
-                    style.opacity !== "0" &&
-                    rect.bottom > 0 &&
-                    rect.right > 0 &&
-                    rect.top < window.innerHeight &&
-                    rect.left < window.innerWidth
-                );
+            const viewportArea = window.innerWidth * window.innerHeight;
+            const visibleArea = (rect) => {
+                const width = Math.min(rect.right, window.innerWidth) - Math.max(rect.left, 0);
+                const height = Math.min(rect.bottom, window.innerHeight) - Math.max(rect.top, 0);
+                return Math.max(0, width) * Math.max(0, height);
             };
-            const video = Array.from(document.querySelectorAll("video")).find(isVisible);
-            const img = Array.from(document.querySelectorAll(imageSelector)).find(isVisible);
-            return { url: location.href, src: img ? img.src : null, isVideo: !!video };
+            const isRendered = (el) => {
+                const style = window.getComputedStyle(el);
+                return style.display !== "none" && style.visibility !== "hidden" && style.opacity !== "0";
+            };
+
+            // Any large image or video on screen is a candidate: class names
+            // change, so the known class is only a preference
+            const candidates = Array.from(document.querySelectorAll("img, video")).filter(el =>
+                (el.tagName === "VIDEO" || el.src) &&
+                isRendered(el) &&
+                visibleArea(el.getBoundingClientRect()) >= viewportArea * 0.05
+            );
+
+            // Google Photos keeps neighbouring photos in the DOM. The current one
+            // is not hidden, and covers the centre of the screen.
+            const cx = window.innerWidth / 2;
+            const cy = window.innerHeight / 2;
+            const score = (el) => {
+                const rect = el.getBoundingClientRect();
+                return [
+                    !el.closest('[aria-hidden="true"]'),
+                    !el.checkVisibility || el.checkVisibility({ checkOpacity: true, checkVisibilityCSS: true }),
+                    rect.left <= cx && rect.right >= cx && rect.top <= cy && rect.bottom >= cy,
+                    el.tagName === "VIDEO" || el.matches(imageSelector),
+                    visibleArea(rect)
+                ].map(Number);
+            };
+            const compare = (a, b) => {
+                const sa = score(a);
+                const sb = score(b);
+                const i = sa.findIndex((value, idx) => value !== sb[idx]);
+                return i === -1 ? 0 : sb[i] - sa[i];
+            };
+
+            const current = candidates.sort(compare)[0];
+            const isVideo = current?.tagName === "VIDEO";
+            const debug = `${document.querySelectorAll(imageSelector).length} known img(s), ` +
+                `${document.images.length} img(s) total, ${candidates.length} large candidate(s)` +
+                (current ? `, picked <${current.tagName.toLowerCase()} class="${current.className}"> score=${score(current)}` : "");
+            return { url: location.href, src: current && !isVideo ? current.src : null, isVideo, debug };
         },
         args: [SELECTORS.image]
     });
@@ -294,15 +325,23 @@ async function readPhoto(tabId) {
  */
 async function waitForPhoto(tabId, previousSrc = null) {
     let photo;
+    let candidate = null;
     for (let attempt = 1; attempt <= RETRY.findPhoto; attempt++) {
         photo = await readPhoto(tabId);
-        const isNewImage = photo.src && photo.src !== previousSrc;
-        if (photo.isVideo || isNewImage || !PHOTO_VIEW_PATTERN.test(photo.url)) {
-            return photo;
-        }
+        if (!PHOTO_VIEW_PATTERN.test(photo.url)) return photo;
+
+        // Require the same reading twice so a photo mid-transition isn't scored
+        const isReady = photo.isVideo || (photo.src && photo.src !== previousSrc);
+        const isStable = candidate &&
+            candidate.url === photo.url &&
+            candidate.src === photo.src &&
+            candidate.isVideo === photo.isVideo;
+        if (isReady && isStable) return photo;
+
+        candidate = isReady ? photo : null;
         await wait(DELAYS.poll);
     }
-    debugLog(`[Warning] Photo didn't load in time`);
+    debugLog(`[Warning] Photo didn't load in time (${photo.src ? "image kept changing" : "no image found"}; ${photo.debug})`);
     return photo;
 }
 
@@ -439,11 +478,11 @@ async function testCurrentPhoto(tabId, threshold) {
     const photo = await waitForPhoto(tabId);
     if (photo.isVideo || !photo.src) throw new JobError("errNoImage");
 
-    state.previewSrc = photo.src;
     setStatus("statusTesting");
 
     const result = decide(await classifyImage(photo.src), threshold);
     state.lastResult = result;
+    state.previewSrc = result.thumbnail;
     debugLog(`Result: ${result.willDelete ? "DELETE" : "KEEP"} (forgettable ${(result.probOlvidable * 100).toFixed(1)}%)`);
 
     const pct = (result.confidence * 100).toFixed(0);
@@ -489,13 +528,20 @@ async function cleanPhotos(tabId, count, threshold) {
             if (consecutiveSkips >= RETRY.maxSkips) throw new JobError("errTooManySkips");
         } else {
             consecutiveSkips = 0;
-            state.previewSrc = photo.src;
+            // Clear the previous thumbnail so it isn't mistaken for this photo
+            state.previewSrc = null;
             state.lastResult = null;
             publishState();
 
             const result = decide(await classifyImage(photo.src), threshold);
             state.lastResult = result;
+            state.previewSrc = result.thumbnail;
             const pct = (result.probOlvidable * 100).toFixed(1);
+            setStatus(result.willDelete ? "statusVerdictDelete" : "statusVerdictKeep", {
+                current: state.current,
+                total: count,
+                pct: (result.probOlvidable * 100).toFixed(0)
+            });
 
             if (result.willDelete) {
                 debugLog(`-> Forgettable (${pct}%), deleting`);
@@ -506,6 +552,7 @@ async function cleanPhotos(tabId, count, threshold) {
                 if (!nextUrl) throw new JobError("errDeleteFailed");
 
                 state.deleted++;
+                state.deletedThumbs.unshift(result.thumbnail);
                 publishState();
 
                 if (!PHOTO_VIEW_PATTERN.test(nextUrl)) {

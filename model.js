@@ -5,6 +5,7 @@
 // --- Constants ---------------------------------------------------------------
 const MODEL_URL = chrome.runtime.getURL('model/resnet50_fine_tunned_classifier.onnx');
 const IMAGE_SIZE = 512;
+const THUMBNAIL_SIZE = 96;
 const NORMALIZATION = {
     mean: [0.485, 0.456, 0.406],
     std: [0.229, 0.224, 0.225]
@@ -36,9 +37,28 @@ async function loadModel() {
 // =============================================================================
 
 /**
+ * Draws a small square thumbnail (center-cropped) as a data URL
+ * @param {HTMLImageElement} img - Loaded image
+ * @returns {string} JPEG data URL
+ */
+function makeThumbnail(img) {
+    const canvas = document.createElement("canvas");
+    canvas.width = THUMBNAIL_SIZE;
+    canvas.height = THUMBNAIL_SIZE;
+
+    const side = Math.min(img.naturalWidth, img.naturalHeight);
+    const sx = (img.naturalWidth - side) / 2;
+    const sy = (img.naturalHeight - side) / 2;
+    canvas.getContext("2d").drawImage(img, sx, sy, side, side, 0, 0, THUMBNAIL_SIZE, THUMBNAIL_SIZE);
+
+    return canvas.toDataURL("image/jpeg", 0.7);
+}
+
+/**
  * Preprocesses an image for the ResNet50 model
  * @param {string} imageSrc - Image source URL
- * @returns {Promise<Float32Array>} Normalized tensor data
+ * @returns {Promise<{tensorData: Float32Array, thumbnail: string}>}
+ *          Normalized tensor data, plus a thumbnail of what was classified
  */
 async function preprocessImage(imageSrc) {
     return new Promise((resolve, reject) => {
@@ -75,7 +95,7 @@ async function preprocessImage(imageSrc) {
                 }
             }
 
-            resolve(tensorData);
+            resolve({ tensorData, thumbnail: makeThumbnail(img) });
         };
 
         img.onerror = () => reject(new Error("Could not load image"));
@@ -135,7 +155,7 @@ async function classifyImage(imageSrc) {
     
     // Preprocess image
     debugLog("Preprocessing...");
-    const tensorData = await preprocessImage(imageSrc);
+    const { tensorData, thumbnail } = await preprocessImage(imageSrc);
 
     // Run inference
     debugLog("Running model...");
@@ -146,7 +166,8 @@ async function classifyImage(imageSrc) {
 
     // Interpret result
     const result = interpretResult(output.data);
-    
+    result.thumbnail = thumbnail;
+
     debugLog(
         result.isMemborable
             ? `[MEMORABLE] (${(result.confidence * 100).toFixed(1)}%)`

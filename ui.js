@@ -25,46 +25,61 @@ function debugLog(msg) {
 // =============================================================================
 
 /**
- * Displays the photo being classified as a preview image
- * @param {string} imageSrc - Image source URL
+ * Renders text where **words** are shown in bold, without using innerHTML
+ * @param {HTMLElement} el - Target element
+ * @param {string} text - Text with optional **bold** markers
+ * @param {string} boldClass - Class for the bold parts
  */
-function showPreview(imageSrc) {
-    const preview = document.getElementById("preview");
-    const container = document.getElementById("previewContainer");
-
-    if (preview && preview.src !== imageSrc) {
-        preview.src = imageSrc;
-    }
-    if (container) {
-        container.classList.add("visible");
-    }
+function renderRichText(el, text, boldClass = "") {
+    el.textContent = "";
+    text.split(/\*\*(.+?)\*\*/).forEach((part, i) => {
+        if (i % 2 === 0) {
+            el.append(part);
+        } else {
+            const strong = document.createElement("strong");
+            strong.textContent = part;
+            if (boldClass) strong.className = boldClass;
+            el.append(strong);
+        }
+    });
 }
 
 /**
- * Shows the classification result badge on the preview
- * @param {Object} result - { willDelete, isMemborable, confidence }
+ * Shows a thumbnail of the photo being scored, outlined by its verdict
+ * @param {string|null} imageSrc - Thumbnail data URL
+ * @param {string} verdictClass - "verdict-keep", "verdict-delete" or ""
  */
-function showResultBadge(result) {
-    const resultDiv = document.getElementById("result");
-    if (!resultDiv) return;
-
-    // Only quote a percentage when it backs the action taken
-    const backsAction = result.willDelete !== result.isMemborable;
-    const percent = backsAction ? ` ${(result.confidence * 100).toFixed(0)}%` : "";
-
-    resultDiv.textContent = (result.willDelete ? t('delete') : t('keep')) + percent;
-    resultDiv.className = result.willDelete ? "result-forgettable" : "result-memorable";
-    resultDiv.style.display = "block";
+function renderThumb(imageSrc, verdictClass) {
+    const thumb = document.getElementById("thumb");
+    if (!imageSrc) {
+        thumb.classList.remove("visible");
+        return;
+    }
+    if (thumb.src !== imageSrc) thumb.src = imageSrc;
+    thumb.className = `thumb visible ${verdictClass}`;
 }
 
 /**
- * Hides the result badge
+ * Shows thumbnails of the photos deleted this run, newest first
+ * @param {string[]} thumbs - Thumbnail data URLs
  */
-function hideResultBadge() {
-    const resultDiv = document.getElementById("result");
-    if (resultDiv) {
-        resultDiv.style.display = "none";
-    }
+function renderDeleted(thumbs = []) {
+    const section = document.getElementById("deletedSection");
+    const strip = document.getElementById("deletedStrip");
+
+    section.classList.toggle("visible", thumbs.length > 0);
+    document.getElementById("deletedCount").textContent = thumbs.length;
+
+    // Only rebuild when something was added
+    if (strip.childElementCount === thumbs.length) return;
+    strip.textContent = "";
+    thumbs.forEach(src => {
+        const img = document.createElement("img");
+        img.src = src;
+        img.alt = "";
+        img.loading = "lazy";
+        strip.append(img);
+    });
 }
 
 // =============================================================================
@@ -88,7 +103,12 @@ function renderRun(state) {
     statusLine.classList.toggle("error", state.status.kind === "error");
     statusLine.classList.toggle("success", state.status.kind === "done");
     document.getElementById("spinner").classList.toggle("visible", state.running);
-    document.getElementById("statusText").textContent = t(state.status.key, state.status.params);
+
+    // Verdict: bold KEEP/DELETE and a thumbnail of the photo that was scored
+    const verdictClass = !state.lastResult ? ""
+                       : state.lastResult.willDelete ? "verdict-delete" : "verdict-keep";
+    renderRichText(document.getElementById("statusText"), t(state.status.key, state.status.params), verdictClass);
+    renderThumb(state.previewSrc, verdictClass);
 
     // Progress and stats only make sense for a cleaning run
     const isClean = state.mode === "clean";
@@ -102,16 +122,7 @@ function renderRun(state) {
         document.getElementById("statDeleted").textContent = state.deleted;
         document.getElementById("statSkipped").textContent = state.skipped;
     }
-
-    // Preview and verdict
-    if (state.previewSrc) {
-        showPreview(state.previewSrc);
-    }
-    if (state.lastResult) {
-        showResultBadge(state.lastResult);
-    } else {
-        hideResultBadge();
-    }
+    renderDeleted(state.deletedThumbs);
 }
 
 // =============================================================================
@@ -151,7 +162,4 @@ document.addEventListener('DOMContentLoaded', initInfoModal);
 // EXPORTS (for other scripts)
 // =============================================================================
 window.debugLog = debugLog;
-window.showPreview = showPreview;
-window.showResultBadge = showResultBadge;
-window.hideResultBadge = hideResultBadge;
 window.renderRun = renderRun;

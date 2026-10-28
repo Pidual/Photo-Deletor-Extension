@@ -105,6 +105,7 @@
     <!-- Run: status, progress and the last photo checked -->
     <div id="runCard" class="card run-card">
         <div class="status-line">
+            <img id="thumb" class="thumb" alt="" />
             <span id="spinner" class="spinner"></span>
             <span id="statusText"></span>
         </div>
@@ -115,9 +116,12 @@
             <div class="stat stat-deleted"><div class="stat-value" id="statDeleted">0</div><div class="stat-label" data-i18n="deleted">Deleted</div></div>
             <div class="stat stat-skipped"><div class="stat-value" id="statSkipped">0</div><div class="stat-label" data-i18n="skipped">Skipped</div></div>
         </div>
-        <div class="preview-container" id="previewContainer">
-            <img id="preview" alt="" />
-            <div id="result"></div>
+        <div id="deletedSection" class="deleted-section">
+            <div class="deleted-title">
+                <span data-i18n="deletedThisRun">Deleted this run</span>
+                <span id="deletedCount"></span>
+            </div>
+            <div id="deletedStrip" class="deleted-strip"></div>
         </div>
     </div>
 
