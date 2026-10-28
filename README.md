@@ -5,8 +5,6 @@ A Chrome/Edge extension that cleans up your Google Photos library with a neural 
 No cloud, no API calls, no accounts: your photos never leave your computer.
 
 ## Demo
-
-https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
 Watch the full demo on YouTube 
 Full Demo: https://youtu.be/rt3Lrnmz_Lc
 
