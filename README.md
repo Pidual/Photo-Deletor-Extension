@@ -7,8 +7,8 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 ## Demo
 
 https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
-
-[![Watch the full demo on YouTube](https://img.youtube.com/vi/rt3Lrnmz_Lc/hqdefault.jpg)](https://youtu.be/rt3Lrnmz_Lc)
+Watch the full demo on YouTube 
+Full Demo: https://youtu.be/rt3Lrnmz_Lc
 
 <img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 
