@@ -13,7 +13,7 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 
 https://github.com/user-attachments/assets/0e008300-4f26-4b62-9c40-f941e50bbda1
 
-[![Watch the full demo on YouTube](https://img.youtube.com/vi/rt3Lrnmz_Lc/hqdefault.jpg)](https://youtu.be/rt3Lrnmz_Lc)
+[![Watch the full demo on YouTube]](https://youtu.be/rt3Lrnmz_Lc)
 
 ## Features
 
