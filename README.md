@@ -1,7 +1,3 @@
-
-https://youtu.be/rt3Lrnmz_Lc
-https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
-
 # Photo Deleter for Google Photos
 
 A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
@@ -10,16 +6,13 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 
 ## Demo
 
+https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
+
+[![Watch the full demo on YouTube](https://img.youtube.com/vi/rt3Lrnmz_Lc/hqdefault.jpg)](https://youtu.be/rt3Lrnmz_Lc)
+
 <img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 
 ## Features
-
-
-
-
-
-
-
 
 - **Local AI:** a fine-tuned ResNet50 model runs on-device through ONNX Runtime Web (WebAssembly).
 - **Keeps running when the popup closes:** the cleanup runs in the background, so you can close the popup and reopen it later to check progress.
@@ -96,6 +89,10 @@ All processing happens locally in your browser. No images, URLs, results or any 
 - Smaller, faster model (MobileNet / EfficientNet, quantized).
 - Review mode: scan first, then confirm which photos to delete.
 - More interface languages.
+
+## Disclaimer
+
+This project is not affiliated with, endorsed by, or sponsored by Google. It automates the Google Photos website the way a person would, and it deletes photos, so **use it at your own risk**: try it on a few photos first and use a high confidence setting. Deleted photos stay in the Google Photos Trash, where you can restore them.
 
 ## Author
 
