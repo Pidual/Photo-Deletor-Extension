@@ -1,5 +1,5 @@
 
-
+https://youtu.be/rt3Lrnmz_Lc
 https://github.com/user-attachments/assets/70d54eab-aee9-45e8-aeb2-b3bc92b50469
 
 # Photo Deleter for Google Photos
