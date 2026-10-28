@@ -12,6 +12,10 @@ No cloud, no API calls, no accounts: your photos never leave your computer.
 
 ## Features
 
+https://github.com/user-attachments/assets/5cca4247-6066-4782-b0be-866344efeabc
+
+
+
 - **Local AI:** a fine-tuned ResNet50 model runs on-device through ONNX Runtime Web (WebAssembly).
 - **Keeps running when the popup closes:** the cleanup runs in the background, so you can close the popup and reopen it later to check progress.
 - **You choose how cautious it is:** only delete when the AI is at least X% sure (80% by default).
