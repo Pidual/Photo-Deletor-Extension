@@ -12,7 +12,7 @@
  */
 function debugLog(msg) {
     console.log(msg);
-    
+
     const debugDiv = document.getElementById("debug");
     if (debugDiv) {
         debugDiv.textContent += msg + "\n";
@@ -21,73 +21,39 @@ function debugLog(msg) {
 }
 
 // =============================================================================
-// IMAGE VISUALIZATION
-// =============================================================================
-
-/**
- * Displays tensor data as a preview image
- * @param {Float32Array} tensorData - Preprocessed image tensor
- * @param {number} size - Image dimensions (default 512)
- */
-function showTensorAsImage(tensorData, size = 512) {
-    const canvas = document.createElement("canvas");
-    canvas.width = size;
-    canvas.height = size;
-    
-    const ctx = canvas.getContext("2d");
-    const imageData = ctx.createImageData(size, size);
-    const data = imageData.data;
-
-    // Convert CHW tensor back to RGBA image
-    for (let i = 0; i < size * size; i++) {
-        data[i * 4]     = Math.round(tensorData[i] * 255);                    // R
-        data[i * 4 + 1] = Math.round(tensorData[size * size + i] * 255);      // G
-        data[i * 4 + 2] = Math.round(tensorData[2 * size * size + i] * 255);  // B
-        data[i * 4 + 3] = 255;                                                 // A
-    }
-
-    ctx.putImageData(imageData, 0, 0);
-    
-    const preview = document.getElementById("preview");
-    const placeholder = document.querySelector(".preview-placeholder");
-    
-    if (preview) {
-        preview.src = canvas.toDataURL();
-        preview.style.display = "block";
-    }
-    
-    if (placeholder) {
-        placeholder.style.display = "none";
-    }
-}
-
-// =============================================================================
 // RESULT DISPLAY
 // =============================================================================
 
 /**
- * Shows the classification result badge on the preview
- * @param {boolean} isMemborable - Whether the image is memorable
- * @param {number} confidence - Confidence percentage (0-1)
+ * Displays the photo being classified as a preview image
+ * @param {string} imageSrc - Image source URL
  */
-function showResultBadge(isMemborable, confidence) {
+function showPreview(imageSrc) {
+    const preview = document.getElementById("preview");
+    const container = document.getElementById("previewContainer");
+
+    if (preview && preview.src !== imageSrc) {
+        preview.src = imageSrc;
+    }
+    if (container) {
+        container.classList.add("visible");
+    }
+}
+
+/**
+ * Shows the classification result badge on the preview
+ * @param {Object} result - { willDelete, isMemborable, confidence }
+ */
+function showResultBadge(result) {
     const resultDiv = document.getElementById("result");
     if (!resultDiv) return;
 
-    const percent = (confidence * 100).toFixed(0);
-    
-    // Use translations if available
-    const keepText = typeof t === 'function' ? t('keep') : 'KEEP';
-    const deleteText = typeof t === 'function' ? t('delete') : 'DELETE';
-    
-    if (isMemborable) {
-        resultDiv.textContent = `${keepText} (${percent}%)`;
-        resultDiv.className = "result-memorable";
-    } else {
-        resultDiv.textContent = `${deleteText} (${percent}%)`;
-        resultDiv.className = "result-forgettable";
-    }
-    
+    // Only quote a percentage when it backs the action taken
+    const backsAction = result.willDelete !== result.isMemborable;
+    const percent = backsAction ? ` ${(result.confidence * 100).toFixed(0)}%` : "";
+
+    resultDiv.textContent = (result.willDelete ? t('delete') : t('keep')) + percent;
+    resultDiv.className = result.willDelete ? "result-forgettable" : "result-memorable";
     resultDiv.style.display = "block";
 }
 
@@ -102,38 +68,49 @@ function hideResultBadge() {
 }
 
 // =============================================================================
-// STATS BAR
+// RUN CARD
 // =============================================================================
 
 /**
- * Shows and updates the stats bar
- * @param {number} current - Current photo number
- * @param {number} total - Total photos to process
- * @param {number} kept - Photos kept
- * @param {number} deleted - Photos deleted
+ * Renders status, progress, stats and preview for the current/last job
+ * @param {Object} state - Job state from the background
  */
-function updateStats(current, total, kept, deleted) {
-    const statsBar = document.getElementById("statsBar");
-    const statProgress = document.getElementById("statProgress");
-    const statKept = document.getElementById("statKept");
-    const statDeleted = document.getElementById("statDeleted");
-    
-    if (statsBar) {
-        statsBar.classList.add("active");
+function renderRun(state) {
+    const runCard = document.getElementById("runCard");
+    if (!state.status) {
+        runCard.classList.remove("visible");
+        return;
     }
-    
-    if (statProgress) statProgress.textContent = `${current}/${total}`;
-    if (statKept) statKept.textContent = kept;
-    if (statDeleted) statDeleted.textContent = deleted;
-}
+    runCard.classList.add("visible");
 
-/**
- * Hides the stats bar
- */
-function hideStats() {
-    const statsBar = document.getElementById("statsBar");
-    if (statsBar) {
-        statsBar.classList.remove("active");
+    // Status line
+    const statusLine = runCard.querySelector(".status-line");
+    statusLine.classList.toggle("error", state.status.kind === "error");
+    statusLine.classList.toggle("success", state.status.kind === "done");
+    document.getElementById("spinner").classList.toggle("visible", state.running);
+    document.getElementById("statusText").textContent = t(state.status.key, state.status.params);
+
+    // Progress and stats only make sense for a cleaning run
+    const isClean = state.mode === "clean";
+    runCard.querySelector(".progress").style.display = isClean ? "block" : "none";
+    runCard.querySelector(".stats").style.display = isClean ? "flex" : "none";
+    if (isClean) {
+        const percent = state.total ? (state.current / state.total) * 100 : 0;
+        document.getElementById("progressFill").style.width = `${percent}%`;
+        document.getElementById("statProgress").textContent = `${state.current}/${state.total}`;
+        document.getElementById("statKept").textContent = state.kept;
+        document.getElementById("statDeleted").textContent = state.deleted;
+        document.getElementById("statSkipped").textContent = state.skipped;
+    }
+
+    // Preview and verdict
+    if (state.previewSrc) {
+        showPreview(state.previewSrc);
+    }
+    if (state.lastResult) {
+        showResultBadge(state.lastResult);
+    } else {
+        hideResultBadge();
     }
 }
 
@@ -174,12 +151,7 @@ document.addEventListener('DOMContentLoaded', initInfoModal);
 // EXPORTS (for other scripts)
 // =============================================================================
 window.debugLog = debugLog;
-window.showTensorAsImage = showTensorAsImage;
+window.showPreview = showPreview;
 window.showResultBadge = showResultBadge;
 window.hideResultBadge = hideResultBadge;
-window.updateStats = updateStats;
-window.hideStats = hideStats;
-
-
-
-
+window.renderRun = renderRun;
