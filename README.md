@@ -2,7 +2,8 @@
 
 This Chrome/Edge extension injects a content script into Google Photos (photos.google.com) and listens to popup actions. The current action replaces the displayed photo with the extension icon to verify DOM access and messaging reliability.
 
- 
+ <img width="1172" height="820" alt="image" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
+
 ## Quick Setup
  
 1. Open Chrome/Edge.
