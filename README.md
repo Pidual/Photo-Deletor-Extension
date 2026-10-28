@@ -1,20 +1,19 @@
 # Photo Deleter for Google Photos
 
-
-!!! El entrenamiento fue hecho en otro repositorio este es solo dedicado a la extension donde se aloja el modelo Entrenamiento https://github.com/Pidual/Photo-Deletor-Model-Training !!!
-<img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
 
 No cloud, no API calls, no accounts: your photos never leave your computer.
 
-## Demo
-Watch the full demo on YouTube 
-Full Demo: https://youtu.be/rt3Lrnmz_Lc
+<img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 
+> [!NOTE]
+> This repository contains only the extension, which hosts the trained model. The model was trained in a separate repository: **[Photo-Deletor-Model-Training](https://github.com/Pidual/Photo-Deletor-Model-Training)**.
+
+## Demo
 
 https://github.com/user-attachments/assets/0e008300-4f26-4b62-9c40-f941e50bbda1
 
-
+[![Watch the full demo on YouTube](https://img.youtube.com/vi/rt3Lrnmz_Lc/hqdefault.jpg)](https://youtu.be/rt3Lrnmz_Lc)
 
 ## Features
 
@@ -66,7 +65,7 @@ offscreen document ─────────── ONNX Runtime + ResNet50 →
 - **`background.js`**: the cleanup loop. For each photo it reads the image on screen, asks the model for a verdict, then clicks Trash → Confirm, or Next. Each delete is verified by checking that the photo actually left the screen.
 - **`offscreen.html` / `offscreen.js` / `model.js`**: a hidden page that hosts the model, because service workers have no canvas. Images are resized to 512×512, normalized with ImageNet statistics and classified as *memorable* or *forgettable*.
 - **`ort/`**: ONNX Runtime Web 1.17.
-- **`model/`**: the fine-tuned ResNet50 classifier.
+- **`model/`**: the fine-tuned ResNet50 classifier, trained in [Photo-Deletor-Model-Training](https://github.com/Pidual/Photo-Deletor-Model-Training).
 
 ## Privacy
 
