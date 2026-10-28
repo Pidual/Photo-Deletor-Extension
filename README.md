@@ -1,95 +1,93 @@
-# Google Photos Cleaner
+# Photo Deleter for Google Photos
 
-This Chrome/Edge extension injects a content script into Google Photos (photos.google.com) and listens to popup actions. The current action replaces the displayed photo with the extension icon to verify DOM access and messaging reliability.
+A Chrome/Edge extension that cleans up your Google Photos library with a neural network that runs **entirely in your browser**. It walks through your photos one by one, keeps the ones worth remembering (friends, parties, trips) and moves the clutter (memes, screenshots, junk) to the Trash.
 
- <img width="1172" height="820" alt="image" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
+No cloud, no API calls, no accounts: your photos never leave your computer.
 
-## Quick Setup
- 
-1. Open Chrome/Edge.
-2. Navigate to `chrome://extensions/` or `edge://extensions/`.
-3. Enable **Developer mode**.
-4. Click **Load unpacked** and select this folder: `photo-deletor-extension`.
+## Demo
 
- 
- 
-## Targeted Testing Steps
-Follow these steps to validate injection, messaging, and SPA resilience.
+[![Watch the demo on YouTube](https://img.youtube.com/vi/DTuE71kjiAA/hqdefault.jpg)](https://www.youtube.com/watch?v=DTuE71kjiAA)
 
-### A. Injection & Permissions
- 
-- Open `https://photos.google.com/` and sign in.
-- Confirm the extension icon appears in the toolbar.
-- Open DevTools (F12) on the Photos tab and select the **Console**.
-- Expect logs from `content.js` (e.g., startup messages and observer hooks).
+<img width="1172" height="820" alt="Photo Deleter popup in Google Photos" src="https://github.com/user-attachments/assets/bb758bdd-3b3e-4009-80c9-d4e48d0c3439" />
 
-### B. Popup → Content Messaging
- 
-- In Google Photos, open a single photo view.
-- Click the extension icon to open the popup.
-- Click the button (currently triggers `REPLACE_IMAGE`).
-- In Console, verify logs like:
-  - `Received message: REPLACE_IMAGE`
-  - Selector checks for the main image (FOUND/MISS)
-  - `replaceCurrentImage: success` or failure details
-- Visual: the main photo should visually change to the extension icon (`icons/icon128.png`).
+## Features
 
-### C. SPA Navigation Resilience
- 
-- Use the left/right navigation arrows or press arrow keys to move to another photo.
-- Watch Console logs for history hooks and MutationObserver activity:
-  - `pushState/replaceState/popstate` messages
-  - `MutationObserver triggered` and subsequent image checks
-- Trigger the popup action again to confirm the new photo is found and replaced.
+- **Local AI:** a fine-tuned ResNet50 model runs on-device through ONNX Runtime Web (WebAssembly).
+- **Keeps running when the popup closes:** the cleanup runs in the background, so you can close the popup and reopen it later to check progress.
+- **You choose how cautious it is:** only delete when the AI is at least X% sure (80% by default).
+- **See what it decides:** each photo's verdict is shown in bold (**KEEP** / **DELETE**) next to a thumbnail of the exact image the AI scored.
+- **"Deleted this run" gallery** so you can review everything that went to the Trash.
+- **Test mode:** check what the AI thinks of a photo without deleting anything.
+- **Safe by design:** photos go to the Google Photos Trash (restorable). Videos are skipped, and the run stops with a clear message if anything on the page doesn't behave as expected.
+- **English and Spanish** interface.
 
-### D. Multi-Layout Coverage
- 
-- Test from different views:
-  - Single photo detail view
-  - Lightbox modal (if present)
-  - Slideshow or keyboard navigation
-- Confirm selectors still locate the main image; note any missed cases.
+## Installation
 
-### E. Edge Browser Check
- 
-- Load unpacked on Edge (`edge://extensions/`).
-- Repeat A–D on Edge using the same account.
+The extension isn't on the Chrome Web Store yet, so install it in developer mode:
 
- 
- 
-## Quick Troubleshooting
-- No logs in Console:
-  - Ensure `manifest.json` has `content_scripts` matching `https://photos.google.com/*`.
-  - Reload the extension and refresh the Photos tab.
-- Popup says "Couldn’t find content script":
-  - The tab must match `photos.google.com` and have the content script injected.
-  - Try reloading the Photos tab or navigating into a single photo.
-- Works on first photo but not after navigation:
-  - Confirm history hook and mutation logs appear when moving between photos.
-  - If logs show repeated `img not found`, the Google Photos DOM may have changed; broaden selectors.
-- Icon path errors:
-  - Verify resource URLs point to `icons/icon128.png` (relative to extension root).
-- Interference from other extensions:
-  - Temporarily disable other content-injecting or ad-blocking extensions and retry.
+1. Clone or download this repository.
+2. Open `chrome://extensions/` (or `edge://extensions/`).
+3. Turn on **Developer mode**.
+4. Click **Load unpacked** and select the repository folder.
+5. Pin the extension to the toolbar.
 
- 
- 
-## Known Limitations
-- Google Photos is a dynamic SPA and may change class names/structure. Selectors may need updates over time.
-- Current action is image replacement for verification. Deleting to trash would require additional robust UI detection and confirmation handling.
+> The model file is ~94 MB. If you clone with Git, make sure `model/resnet50_fine_tunned_classifier.onnx` downloaded completely.
 
- 
-## Next Steps (Optional)
-- Add a toast UI in `content.js` to show success/failure without DevTools.
-- Expand selector strategy and consider shadow DOM traversal if Google Photos encapsulates key nodes.
-- Reintroduce a safe "Delete to Trash" action behind a separate popup control with double-confirm.
+## How to use
 
- 
-## Development Notes
-- Files of interest:
-  - `manifest.json`: MV3 configuration, content script injection
-  - `popup.js`: Sends actions to the active tab
-  - `content.js`: Handles messages, finds main photo, replaces the image, observes navigation/DOM changes
-  - `background.js`: Optional injection path (currently not used by the popup)
-- Use the Console logs to trace behavior across navigation and DOM changes.
+1. Open [Google Photos](https://photos.google.com/) and click the extension icon.
+2. Open the photo you want to start from, or click **Start from newest photo**. Cleaning moves forward from there.
+3. *(Optional)* Click **Test on this photo** to see what the AI would do, without deleting anything.
+4. Choose **how many photos to check** and **how sure** the AI must be before deleting.
+5. Click **Start cleaning**. You can close the popup; click **Stop** at any time.
+6. When it's done, review the **Deleted this run** thumbnails. Anything you want back can be restored from the Google Photos Trash.
 
+The first run takes a few seconds while the model loads.
+
+## How it works
+
+```
+popup (controls & status)
+   │  start / stop / test
+   ▼
+background service worker ──── drives the Google Photos tab (find photo, trash, next)
+   │  classify this image
+   ▼
+offscreen document ─────────── ONNX Runtime + ResNet50 → keep / delete + thumbnail
+```
+
+- **`popup.*`, `ui.js`, `i18n.js`**: the interface. It only sends commands and shows the job state, so it can be closed and reopened mid-run.
+- **`background.js`**: the cleanup loop. For each photo it reads the image on screen, asks the model for a verdict, then clicks Trash → Confirm, or Next. Each delete is verified by checking that the photo actually left the screen.
+- **`offscreen.html` / `offscreen.js` / `model.js`**: a hidden page that hosts the model, because service workers have no canvas. Images are resized to 512×512, normalized with ImageNet statistics and classified as *memorable* or *forgettable*.
+- **`ort/`**: ONNX Runtime Web 1.17.
+- **`model/`**: the fine-tuned ResNet50 classifier.
+
+## Privacy
+
+All processing happens locally in your browser. No images, URLs, results or any other data are sent anywhere. See the [privacy policy](privacy-policy.html).
+
+## Troubleshooting
+
+| Problem | Fix |
+| --- | --- |
+| Changes don't seem to apply | Click the reload ↻ icon on the extension card in `chrome://extensions`, then refresh the Google Photos tab. |
+| "Couldn't find the Trash button" | Google Photos may have changed its layout or uses a language that isn't supported yet. Right-click the trash icon → **Inspect**, and add its `aria-label` to `SELECTORS.trashLabels` in `background.js`. |
+| "Couldn't find a photo on the page" | Make sure a single photo is open (not the grid), then try again. |
+| Want to see what's happening | Open **Details** at the bottom of the popup, or click **service worker** on the extension card for the full log. |
+
+## Limitations
+
+- Google Photos changes its page structure from time to time; button detection may need updates.
+- Button labels are recognized in English and Spanish.
+- The model is large (~94 MB) and runs on the CPU, so each photo takes a moment.
+- The AI judges each photo on its own; it doesn't detect duplicates.
+
+## Roadmap
+
+- Smaller, faster model (MobileNet / EfficientNet, quantized).
+- Review mode: scan first, then confirm which photos to delete.
+- More interface languages.
+
+## Author
+
+Made with effort and passion by [@Pidual](https://github.com/Pidual).
